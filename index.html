@@ -127,8 +127,10 @@
   .gate-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:36px 32px;max-width:340px;width:100%;text-align:center;}
   .gate-card h1{font-family:var(--font-display);font-size:24px;font-weight:600;margin:0 0 4px;}
   .gate-card p{color:var(--ink-muted);font-size:13.5px;margin:0 0 20px;}
-  .gate-card input{font-family:var(--font-mono);font-size:20px;letter-spacing:.3em;text-align:center;width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);}
-  .gate-card .btn{width:100%;margin-top:14px;justify-content:center;}
+  .gate-card .field{margin-bottom:12px;text-align:left;}
+  .gate-card .field label{display:block;margin-bottom:5px;}
+  .gate-card .btn{width:100%;margin-top:4px;justify-content:center;}
+  .current-user{font-size:12.5px;color:var(--ink-muted);margin-right:8px;}
   .gate-error{color:var(--bad);font-size:12.5px;margin-top:10px;min-height:16px;}
 </style>
 </head>
@@ -137,9 +139,16 @@
 <div id="pin-gate" hidden>
   <div class="gate-card">
     <h1>Alquileres Monica</h1>
-    <p>Ingresá la clave del panel</p>
+    <p>Ingresá tu usuario y contraseña</p>
     <form id="gate-form">
-      <input id="gate-pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" autofocus>
+      <div class="field">
+        <label for="gate-user">Usuario</label>
+        <input id="gate-user" type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required autofocus>
+      </div>
+      <div class="field">
+        <label for="gate-pass">Contraseña</label>
+        <input id="gate-pass" type="password" autocomplete="current-password" required>
+      </div>
       <button type="submit" class="btn accent">Entrar</button>
       <div class="gate-error" id="gate-error"></div>
     </form>
@@ -152,7 +161,7 @@
       <h1>Alquileres Monica</h1>
       <span class="eyebrow">Posadas, Misiones</span>
     </div>
-    <div class="top-actions"><button class="btn ghost small" id="btn-logout" hidden>Salir</button></div>
+    <div class="top-actions"><span class="current-user" id="current-user"></span><button class="btn ghost small" id="btn-logout" hidden>Salir</button></div>
   </div>
   <div class="top-inner" style="padding-top:0;">
     <nav class="tabs" id="tabs">
@@ -593,26 +602,42 @@
     }).catch(function(err){ console.error(err); });
   }
 
+  function setCurrentUser(username){
+    document.getElementById('current-user').textContent = username ? username.charAt(0).toUpperCase()+username.slice(1) : '';
+  }
+
   function showGate(){
     document.getElementById('app-main').hidden=true;
     document.getElementById('btn-logout').hidden=true;
+    setCurrentUser('');
     document.getElementById('pin-gate').hidden=false;
-    document.getElementById('gate-pin').focus();
+    document.getElementById('gate-user').focus();
   }
-  function hideGate(){
+  function hideGate(username){
     document.getElementById('pin-gate').hidden=true;
     document.getElementById('app-main').hidden=false;
     document.getElementById('btn-logout').hidden=false;
+    setCurrentUser(username);
   }
 
   document.getElementById('gate-form').addEventListener('submit', function(e){
     e.preventDefault();
-    var pin=document.getElementById('gate-pin').value;
-    fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pin:pin}) })
+    var username=document.getElementById('gate-user').value;
+    var password=document.getElementById('gate-pass').value;
+    fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:username, password:password}) })
       .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
       .then(function(res){
-        if(res.ok && res.d.ok){ document.getElementById('gate-error').textContent=''; hideGate(); switchTab('dashboard'); loadState(); }
-        else { document.getElementById('gate-error').textContent='Clave incorrecta.'; document.getElementById('gate-pin').value=''; document.getElementById('gate-pin').focus(); }
+        if(res.ok && res.d.ok){
+          document.getElementById('gate-error').textContent='';
+          document.getElementById('gate-pass').value='';
+          hideGate(res.d.username);
+          switchTab('dashboard'); loadState();
+        }
+        else {
+          document.getElementById('gate-error').textContent='Usuario o contraseña incorrectos.';
+          document.getElementById('gate-pass').value='';
+          document.getElementById('gate-pass').focus();
+        }
       })
       .catch(function(){ document.getElementById('gate-error').textContent='Error de conexión.'; });
   });
@@ -624,7 +649,7 @@
   setInterval(function(){ if(!document.getElementById('pin-gate').hidden) return; loadState(); }, 20000);
 
   fetch('/api/session').then(function(r){return r.json();}).then(function(s){
-    if(s.authenticated){ hideGate(); switchTab('dashboard'); loadState(); }
+    if(s.authenticated){ hideGate(s.username); switchTab('dashboard'); loadState(); }
     else { showGate(); }
   }).catch(function(){ showGate(); });
 })();

@@ -5,14 +5,9 @@ const cookie = require('cookie');
 const { pool, init } = require('./db');
 
 const PORT = process.env.PORT || 3000;
-const PIN = process.env.PANEL_PIN || '';
 const SECRET = process.env.SESSION_SECRET || 'change-me-please-alquileres-monica';
 const COOKIE_NAME = 'am_session';
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 45; // 45 dias
-
-if (!PIN) {
-  console.warn('ADVERTENCIA: no configuraste PANEL_PIN. El panel va a rechazar todos los logins hasta que lo configures.');
-}
 
 function sign(value) {
   const h = crypto.createHmac('sha256', SECRET).update(value).digest('hex');
@@ -30,24 +25,52 @@ function verify(signed) {
   return value;
 }
 
+// --- contraseñas: scrypt con salt propio por usuario ---
+function hashPassword(password, salt) {
+  salt = salt || crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex');
+  return { salt, hash };
+}
+function verifyPassword(password, salt, hash) {
+  try {
+    const check = crypto.scryptSync(String(password), salt, 64).toString('hex');
+    const a = Buffer.from(check, 'hex');
+    const b = Buffer.from(hash, 'hex');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch (e) {
+    return false;
+  }
+}
+
 const app = express();
 app.use(express.json());
 
-app.post('/api/login', (req, res) => {
-  const pin = String((req.body && req.body.pin) || '');
-  if (!PIN || pin.length === 0 || pin.length !== PIN.length ||
-      !crypto.timingSafeEqual(Buffer.from(pin), Buffer.from(PIN))) {
-    return res.status(401).json({ ok: false, error: 'PIN incorrecto' });
+app.post('/api/login', async (req, res) => {
+  try {
+    const username = String((req.body && req.body.username) || '').trim().toLowerCase();
+    const password = String((req.body && req.body.password) || '');
+    if (!username || !password) {
+      return res.status(401).json({ ok: false, error: 'Usuario y contraseña requeridos' });
+    }
+    const r = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const user = r.rows[0];
+    if (!user || !verifyPassword(password, user.salt, user.hash)) {
+      return res.status(401).json({ ok: false, error: 'Usuario o contraseña incorrectos' });
+    }
+    const token = sign(JSON.stringify({ u: user.username, t: Date.now() }));
+    res.setHeader('Set-Cookie', cookie.serialize(COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: MAX_AGE_MS / 1000,
+      path: '/'
+    }));
+    res.json({ ok: true, username: user.username });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: 'error de servidor' });
   }
-  const token = sign('authed:' + Date.now());
-  res.setHeader('Set-Cookie', cookie.serialize(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: MAX_AGE_MS / 1000,
-    path: '/'
-  }));
-  res.json({ ok: true });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -55,15 +78,25 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-function isAuthed(req) {
+function getSessionUser(req) {
   const cookies = cookie.parse(req.headers.cookie || '');
   const raw = cookies[COOKIE_NAME];
   const value = verify(raw);
-  return !!value && value.startsWith('authed:');
+  if (!value) return null;
+  try {
+    const data = JSON.parse(value);
+    return (data && data.u) ? data.u : null;
+  } catch (e) {
+    return null;
+  }
+}
+function isAuthed(req) {
+  return !!getSessionUser(req);
 }
 
 app.get('/api/session', (req, res) => {
-  res.json({ authenticated: isAuthed(req) });
+  const u = getSessionUser(req);
+  res.json({ authenticated: !!u, username: u || null });
 });
 
 function requireAuth(req, res, next) {

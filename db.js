@@ -18,6 +18,13 @@ const pool = new Pool({
 
 async function init() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      salt TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      creado TIMESTAMPTZ DEFAULT now()
+    );
     CREATE TABLE IF NOT EXISTS properties (
       id SERIAL PRIMARY KEY,
       nombre TEXT NOT NULL,
