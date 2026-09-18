@@ -391,8 +391,10 @@
       ? '<tr><td colspan="7" class="muted">Todavía no cargaste contratos.</td></tr>'
       : rows.map(function(c){
           var prop=propertyById(c.property_id); var st=contractStatus(c);
+          var gCount=(c.garante1_nombre?1:0)+(c.garante2_nombre?1:0);
           return '<tr><td>'+esc(prop?prop.nombre:'(eliminada)')+'</td>'+
-            '<td>'+esc(c.inquilino)+(c.contacto?'<br><span class="muted" style="font-size:12px;">'+esc(c.contacto)+'</span>':'')+'</td>'+
+            '<td>'+esc(c.inquilino)+(c.contacto?'<br><span class="muted" style="font-size:12px;">'+esc(c.contacto)+'</span>':'')+
+            (gCount?'<br><span class="muted" style="font-size:12px;">'+gCount+' garante'+(gCount===1?'':'s')+' cargado'+(gCount===1?'':'s')+'</span>':'')+'</td>'+
             '<td>'+fmtDate(c.fecha_inicio)+'</td><td>'+(c.fecha_fin?fmtDate(c.fecha_fin):'—')+'</td>'+
             '<td class="num">'+money(c.monto_mensual)+'</td><td>'+statusPill(st)+'</td>'+
             '<td><div class="rowactions">'+
@@ -423,8 +425,20 @@
       '<div class="field"><label for="cf-fin">Fin (opcional)</label><input id="cf-fin" name="fecha_fin" type="date" value="'+d10(c&&c.fecha_fin?c.fecha_fin:'')+'"></div>'+
       '<div class="field"><label for="cf-monto">Monto mensual</label><input id="cf-monto" name="monto_mensual" type="number" min="0" step="1000" required value="'+(c?n(c.monto_mensual):'')+'"></div>'+
       '<div class="field"><label for="cf-deposito">Depósito</label><input id="cf-deposito" name="deposito" type="number" min="0" step="1000" value="'+(c&&n(c.deposito)?n(c.deposito):'')+'"></div>'+
-      '<div class="field span2"><label for="cf-notas">Notas</label><textarea id="cf-notas" name="notas">'+esc(c?c.notas:'')+'</textarea></div></div>'+
+      '<div class="field span2"><label for="cf-notas">Notas</label><textarea id="cf-notas" name="notas">'+esc(c?c.notas:'')+'</textarea></div>'+
+      buildGuarantorFields(1, c) + buildGuarantorFields(2, c) +
+      '</div>'+
       '<div class="form-actions"><button type="submit" class="btn accent">Guardar</button><button type="button" class="btn ghost" data-act="cancel-contract">Cancelar</button></div></form></div>';
+  }
+
+  function buildGuarantorFields(num, c){
+    var pfx='garante'+num;
+    var nombre=c?c[pfx+'_nombre']:''; var dni=c?c[pfx+'_dni']:''; var direccion=c?c[pfx+'_direccion']:''; var telefono=c?c[pfx+'_telefono']:'';
+    return '<div class="field span-all" style="grid-column:1/-1;font-size:12.5px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;padding-top:12px;border-top:1px solid var(--line);">Garante '+num+' (opcional)</div>'+
+      '<div class="field span2"><label for="cf-g'+num+'-nombre">Nombre completo</label><input id="cf-g'+num+'-nombre" name="'+pfx+'_nombre" value="'+esc(nombre)+'"></div>'+
+      '<div class="field"><label for="cf-g'+num+'-dni">DNI</label><input id="cf-g'+num+'-dni" name="'+pfx+'_dni" value="'+esc(dni)+'"></div>'+
+      '<div class="field span2"><label for="cf-g'+num+'-direccion">Dirección</label><input id="cf-g'+num+'-direccion" name="'+pfx+'_direccion" value="'+esc(direccion)+'"></div>'+
+      '<div class="field"><label for="cf-g'+num+'-telefono">Teléfono</label><input id="cf-g'+num+'-telefono" name="'+pfx+'_telefono" value="'+esc(telefono)+'"></div>';
   }
 
   function renderPayments(){
@@ -533,7 +547,9 @@
   function mergeContract(id, patch){
     var c=contractById(id)||{};
     var base={ property_id:c.property_id, inquilino:c.inquilino, contacto:c.contacto, fecha_inicio:d10(c.fecha_inicio),
-      fecha_fin:d10(c.fecha_fin)||null, monto_mensual:n(c.monto_mensual), deposito:n(c.deposito), estado:c.estado, notas:c.notas };
+      fecha_fin:d10(c.fecha_fin)||null, monto_mensual:n(c.monto_mensual), deposito:n(c.deposito), estado:c.estado, notas:c.notas,
+      garante1_nombre:c.garante1_nombre, garante1_dni:c.garante1_dni, garante1_direccion:c.garante1_direccion, garante1_telefono:c.garante1_telefono,
+      garante2_nombre:c.garante2_nombre, garante2_dni:c.garante2_dni, garante2_direccion:c.garante2_direccion, garante2_telefono:c.garante2_telefono };
     for(var k in patch){ base[k]=patch[k]; }
     return base;
   }
@@ -558,7 +574,11 @@
       var fd=new FormData(e.target);
       var data={ property_id:Number(fd.get('property_id')), inquilino:(fd.get('inquilino')||'').trim(), contacto:(fd.get('contacto')||'').trim(),
         fecha_inicio:fd.get('fecha_inicio'), fecha_fin:fd.get('fecha_fin')||null, monto_mensual:n(fd.get('monto_mensual')),
-        deposito:n(fd.get('deposito')), estado:'activo', notas:(fd.get('notas')||'').trim() };
+        deposito:n(fd.get('deposito')), estado:'activo', notas:(fd.get('notas')||'').trim(),
+        garante1_nombre:(fd.get('garante1_nombre')||'').trim(), garante1_dni:(fd.get('garante1_dni')||'').trim(),
+        garante1_direccion:(fd.get('garante1_direccion')||'').trim(), garante1_telefono:(fd.get('garante1_telefono')||'').trim(),
+        garante2_nombre:(fd.get('garante2_nombre')||'').trim(), garante2_dni:(fd.get('garante2_dni')||'').trim(),
+        garante2_direccion:(fd.get('garante2_direccion')||'').trim(), garante2_telefono:(fd.get('garante2_telefono')||'').trim() };
       if(!data.property_id || !data.inquilino || !data.fecha_inicio) return;
       var p = ui.contracts.editId ? api('PUT','/api/contracts/'+ui.contracts.editId, data) : api('POST','/api/contracts', data);
       p.then(loadState);

@@ -44,8 +44,24 @@ async function init() {
       deposito NUMERIC DEFAULT 0,
       estado TEXT DEFAULT 'activo',
       notas TEXT,
+      garante1_nombre TEXT,
+      garante1_dni TEXT,
+      garante1_direccion TEXT,
+      garante1_telefono TEXT,
+      garante2_nombre TEXT,
+      garante2_dni TEXT,
+      garante2_direccion TEXT,
+      garante2_telefono TEXT,
       creado TIMESTAMPTZ DEFAULT now()
     );
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante1_nombre TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante1_dni TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante1_direccion TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante1_telefono TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante2_nombre TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante2_dni TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante2_direccion TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante2_telefono TEXT;
     CREATE TABLE IF NOT EXISTS payments (
       id SERIAL PRIMARY KEY,
       contract_id INTEGER REFERENCES contracts(id) ON DELETE CASCADE,

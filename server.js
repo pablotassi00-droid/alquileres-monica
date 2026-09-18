@@ -172,7 +172,9 @@ function crud(table, fields) {
 }
 
 crud('properties', ['nombre', 'tipo', 'alquiler_base', 'notas']);
-crud('contracts', ['property_id', 'inquilino', 'contacto', 'fecha_inicio', 'fecha_fin', 'monto_mensual', 'deposito', 'estado', 'notas']);
+crud('contracts', ['property_id', 'inquilino', 'contacto', 'fecha_inicio', 'fecha_fin', 'monto_mensual', 'deposito', 'estado', 'notas',
+  'garante1_nombre', 'garante1_dni', 'garante1_direccion', 'garante1_telefono',
+  'garante2_nombre', 'garante2_dni', 'garante2_direccion', 'garante2_telefono']);
 crud('expenses', ['property_id', 'categoria', 'monto', 'fecha', 'descripcion']);
 
 // payments: upsert by (contract_id, mes)
