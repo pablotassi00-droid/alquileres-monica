@@ -219,8 +219,16 @@
         <button class="btn accent" id="btn-add-contract">+ Nuevo contrato</button>
       </div>
       <div id="contract-form-slot"></div>
-      <div class="tablewrap"><table>
-        <thead><tr><th>Propiedad</th><th>Inquilino</th><th>Inicio</th><th>Fin</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead>
+      <div class="tablewrap"><table id="contracts-table">
+        <thead><tr>
+          <th class="sortable" data-sort="propiedad">Propiedad<span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="inquilino">Inquilino<span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="inicio">Inicio<span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="fin">Fin<span class="sort-arrow"></span></th>
+          <th class="sortable num" data-sort="monto">Monto<span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="estado">Estado<span class="sort-arrow"></span></th>
+          <th></th>
+        </tr></thead>
         <tbody id="contract-rows"></tbody>
       </table></div>
     </section>
@@ -274,7 +282,7 @@
   var properties=[], contracts=[], payments=[], expenses=[];
   var ui={
     properties:{open:false, editId:null, sortCol:null, sortDir:'desc'},
-    contracts:{open:false, editId:null},
+    contracts:{open:false, editId:null, sortCol:null, sortDir:'desc'},
     expenses:{open:false, editId:null, filter:''},
     payments:{month: currentMonthStr(), editingKey:null}
   };
@@ -384,15 +392,15 @@
     });
   }
 
-  function updateSortHeaders(){
-    var table = document.getElementById('properties-table');
+  function updateSortHeaders(tableId, state){
+    var table = document.getElementById(tableId);
     if(!table) return;
     var ths = table.querySelectorAll('thead th[data-sort]');
     for(var i=0;i<ths.length;i++){
       var th=ths[i], arrow=th.querySelector('.sort-arrow');
-      if(th.dataset.sort===ui.properties.sortCol){
+      if(th.dataset.sort===state.sortCol){
         th.classList.add('active');
-        if(arrow) arrow.textContent = ui.properties.sortDir==='asc' ? '▲' : '▼';
+        if(arrow) arrow.textContent = state.sortDir==='asc' ? '▲' : '▼';
       } else {
         th.classList.remove('active');
         if(arrow) arrow.textContent = '';
@@ -412,7 +420,7 @@
             '<td><div class="rowactions"><button class="btn ghost small" data-act="edit-property" data-id="'+p.id+'">Editar</button>'+
             '<button class="btn ghost small danger" data-act="delete-property" data-id="'+p.id+'">Eliminar</button></div></td></tr>';
         }).join('');
-    updateSortHeaders();
+    updateSortHeaders('properties-table', ui.properties);
 
     var desiredKey = ui.properties.open ? (ui.properties.editId||'add') : 'closed';
     var slot=document.getElementById('property-form-slot');
@@ -429,11 +437,32 @@
       '<div class="form-actions"><button type="submit" class="btn accent">Guardar</button><button type="button" class="btn ghost" data-act="cancel-property">Cancelar</button></div></form></div>';
   }
 
-  function renderContracts(){
-    var rows = contracts.slice().sort(function(a,b){
-      var order={activo:0,proximo:1,vencido:2,finalizado:3};
-      return order[contractStatus(a)]-order[contractStatus(b)] || d10(b.fecha_inicio).localeCompare(d10(a.fecha_inicio));
+  function sortContracts(list){
+    var col = ui.contracts.sortCol;
+    if(!col){
+      return list.slice().sort(function(a,b){
+        var order={activo:0,proximo:1,vencido:2,finalizado:3};
+        return order[contractStatus(a)]-order[contractStatus(b)] || d10(b.fecha_inicio).localeCompare(d10(a.fecha_inicio));
+      });
+    }
+    var dir = ui.contracts.sortDir==='asc' ? 1 : -1;
+    return list.slice().sort(function(a,b){
+      var va, vb;
+      if(col==='propiedad'){ var pa=propertyById(a.property_id), pb=propertyById(b.property_id); va=(pa?pa.nombre:'').toLowerCase(); vb=(pb?pb.nombre:'').toLowerCase(); }
+      else if(col==='inquilino'){ va=(a.inquilino||'').toLowerCase(); vb=(b.inquilino||'').toLowerCase(); }
+      else if(col==='inicio'){ va=d10(a.fecha_inicio)||''; vb=d10(b.fecha_inicio)||''; }
+      else if(col==='fin'){ va=d10(a.fecha_fin)||''; vb=d10(b.fecha_fin)||''; }
+      else if(col==='monto'){ va=n(a.monto_mensual); vb=n(b.monto_mensual); }
+      else if(col==='estado'){ var order={activo:0,proximo:1,vencido:2,finalizado:3}; va=order[contractStatus(a)]; vb=order[contractStatus(b)]; }
+      else { va=0; vb=0; }
+      if(va<vb) return -1*dir;
+      if(va>vb) return 1*dir;
+      return d10(b.fecha_inicio).localeCompare(d10(a.fecha_inicio));
     });
+  }
+
+  function renderContracts(){
+    var rows = sortContracts(contracts);
     document.getElementById('contract-rows').innerHTML = rows.length===0
       ? '<tr><td colspan="7" class="muted">Todavía no cargaste contratos.</td></tr>'
       : rows.map(function(c){
@@ -449,6 +478,7 @@
             (st==='finalizado' ? '<button class="btn ghost small" data-act="reactivate-contract" data-id="'+c.id+'">Reactivar</button>' : '<button class="btn ghost small" data-act="finalize-contract" data-id="'+c.id+'">Finalizar</button>')+
             '<button class="btn ghost small danger" data-act="delete-contract" data-id="'+c.id+'">Eliminar</button></div></td></tr>';
         }).join('');
+    updateSortHeaders('contracts-table', ui.contracts);
 
     var desiredKey = ui.contracts.open ? (ui.contracts.editId||'add') : 'closed';
     var slot=document.getElementById('contract-form-slot');
@@ -605,16 +635,22 @@
     return base;
   }
 
+  function wireSortableHeader(tableId, state, onSort){
+    var thead = document.querySelector('#'+tableId+' thead');
+    if(!thead) return;
+    thead.addEventListener('click', function(e){
+      var th=e.target.closest('th[data-sort]');
+      if(!th) return;
+      var col=th.dataset.sort;
+      if(state.sortCol===col){ state.sortDir = state.sortDir==='asc' ? 'desc' : 'asc'; }
+      else { state.sortCol=col; state.sortDir='desc'; }
+      onSort();
+    });
+  }
   document.getElementById('btn-add-property').addEventListener('click', function(){ ui.properties.open=true; ui.properties.editId=null; renderProperties(); });
-  document.querySelector('#properties-table thead').addEventListener('click', function(e){
-    var th=e.target.closest('th[data-sort]');
-    if(!th) return;
-    var col=th.dataset.sort;
-    if(ui.properties.sortCol===col){ ui.properties.sortDir = ui.properties.sortDir==='asc' ? 'desc' : 'asc'; }
-    else { ui.properties.sortCol=col; ui.properties.sortDir='desc'; }
-    renderProperties();
-  });
+  wireSortableHeader('properties-table', ui.properties, renderProperties);
   document.getElementById('btn-add-contract').addEventListener('click', function(){ ui.contracts.open=true; ui.contracts.editId=null; renderContracts(); });
+  wireSortableHeader('contracts-table', ui.contracts, renderContracts);
   document.getElementById('btn-add-expense').addEventListener('click', function(){ ui.expenses.open=true; ui.expenses.editId=null; renderExpenses(); });
   document.getElementById('pay-month').addEventListener('change', function(e){ ui.payments.month=e.target.value||currentMonthStr(); ui.payments.editingKey=null; renderPayments(); });
 
