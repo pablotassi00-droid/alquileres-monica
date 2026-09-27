@@ -44,6 +44,8 @@ async function init() {
       deposito NUMERIC DEFAULT 0,
       estado TEXT DEFAULT 'activo',
       notas TEXT,
+      locador_nombre TEXT,
+      locador_dni TEXT,
       garante1_nombre TEXT,
       garante1_dni TEXT,
       garante1_direccion TEXT,
@@ -54,6 +56,8 @@ async function init() {
       garante2_telefono TEXT,
       creado TIMESTAMPTZ DEFAULT now()
     );
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS locador_nombre TEXT;
+    ALTER TABLE contracts ADD COLUMN IF NOT EXISTS locador_dni TEXT;
     ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante1_nombre TEXT;
     ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante1_dni TEXT;
     ALTER TABLE contracts ADD COLUMN IF NOT EXISTS garante1_direccion TEXT;

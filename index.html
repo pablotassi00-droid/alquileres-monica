@@ -426,6 +426,9 @@
       '<div class="field"><label for="cf-monto">Monto mensual</label><input id="cf-monto" name="monto_mensual" type="number" min="0" step="1000" required value="'+(c?n(c.monto_mensual):'')+'"></div>'+
       '<div class="field"><label for="cf-deposito">Depósito</label><input id="cf-deposito" name="deposito" type="number" min="0" step="1000" value="'+(c&&n(c.deposito)?n(c.deposito):'')+'"></div>'+
       '<div class="field span2"><label for="cf-notas">Notas</label><textarea id="cf-notas" name="notas">'+esc(c?c.notas:'')+'</textarea></div>'+
+      '<div class="field span-all" style="grid-column:1/-1;font-size:12.5px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.05em;margin-top:8px;padding-top:12px;border-top:1px solid var(--line);">Locador</div>'+
+      '<div class="field span2"><label for="cf-locador-nombre">Nombre completo</label><input id="cf-locador-nombre" name="locador_nombre" value="'+esc(c?c.locador_nombre:'')+'"></div>'+
+      '<div class="field"><label for="cf-locador-dni">DNI</label><input id="cf-locador-dni" name="locador_dni" value="'+esc(c?c.locador_dni:'')+'"></div>'+
       buildGuarantorFields(1, c) + buildGuarantorFields(2, c) +
       '</div>'+
       '<div class="form-actions"><button type="submit" class="btn accent">Guardar</button><button type="button" class="btn ghost" data-act="cancel-contract">Cancelar</button></div></form></div>';
@@ -548,6 +551,7 @@
     var c=contractById(id)||{};
     var base={ property_id:c.property_id, inquilino:c.inquilino, contacto:c.contacto, fecha_inicio:d10(c.fecha_inicio),
       fecha_fin:d10(c.fecha_fin)||null, monto_mensual:n(c.monto_mensual), deposito:n(c.deposito), estado:c.estado, notas:c.notas,
+      locador_nombre:c.locador_nombre, locador_dni:c.locador_dni,
       garante1_nombre:c.garante1_nombre, garante1_dni:c.garante1_dni, garante1_direccion:c.garante1_direccion, garante1_telefono:c.garante1_telefono,
       garante2_nombre:c.garante2_nombre, garante2_dni:c.garante2_dni, garante2_direccion:c.garante2_direccion, garante2_telefono:c.garante2_telefono };
     for(var k in patch){ base[k]=patch[k]; }
@@ -575,6 +579,7 @@
       var data={ property_id:Number(fd.get('property_id')), inquilino:(fd.get('inquilino')||'').trim(), contacto:(fd.get('contacto')||'').trim(),
         fecha_inicio:fd.get('fecha_inicio'), fecha_fin:fd.get('fecha_fin')||null, monto_mensual:n(fd.get('monto_mensual')),
         deposito:n(fd.get('deposito')), estado:'activo', notas:(fd.get('notas')||'').trim(),
+        locador_nombre:(fd.get('locador_nombre')||'').trim(), locador_dni:(fd.get('locador_dni')||'').trim(),
         garante1_nombre:(fd.get('garante1_nombre')||'').trim(), garante1_dni:(fd.get('garante1_dni')||'').trim(),
         garante1_direccion:(fd.get('garante1_direccion')||'').trim(), garante1_telefono:(fd.get('garante1_telefono')||'').trim(),
         garante2_nombre:(fd.get('garante2_nombre')||'').trim(), garante2_dni:(fd.get('garante2_dni')||'').trim(),
