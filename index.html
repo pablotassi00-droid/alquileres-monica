@@ -95,6 +95,10 @@
   .tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow-x:auto;}
   table{width:100%;border-collapse:collapse;min-width:640px;}
   thead th{text-align:left;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-muted);font-weight:600;padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  thead th.sortable{cursor:pointer;user-select:none;}
+  thead th.sortable:hover{color:var(--ink);}
+  thead th.sortable.active{color:var(--accent-strong);}
+  .sort-arrow{display:inline-block;margin-left:4px;font-size:10px;}
   tbody td{padding:12px 14px;border-bottom:1px solid var(--line);font-size:13.5px;vertical-align:middle;}
   tbody tr:last-child td{border-bottom:none;}
   td.num, th.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right;}
@@ -197,8 +201,14 @@
         <button class="btn accent" id="btn-add-property">+ Nueva propiedad</button>
       </div>
       <div id="property-form-slot"></div>
-      <div class="tablewrap"><table>
-        <thead><tr><th>Propiedad</th><th>Tipo</th><th>Estado</th><th class="num">Alquiler ref.</th><th></th></tr></thead>
+      <div class="tablewrap"><table id="properties-table">
+        <thead><tr>
+          <th class="sortable" data-sort="nombre">Propiedad<span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="tipo">Tipo<span class="sort-arrow"></span></th>
+          <th class="sortable" data-sort="estado">Estado<span class="sort-arrow"></span></th>
+          <th class="sortable num" data-sort="alquiler">Alquiler ref.<span class="sort-arrow"></span></th>
+          <th></th>
+        </tr></thead>
         <tbody id="property-rows"></tbody>
       </table></div>
     </section>
@@ -263,7 +273,7 @@
 
   var properties=[], contracts=[], payments=[], expenses=[];
   var ui={
-    properties:{open:false, editId:null},
+    properties:{open:false, editId:null, sortCol:null, sortDir:'desc'},
     contracts:{open:false, editId:null},
     expenses:{open:false, editId:null, filter:''},
     payments:{month: currentMonthStr(), editingKey:null}
@@ -357,8 +367,41 @@
         }).join('') + '<p style="margin:10px 0 4px;"><a class="linklike" data-goto="contracts">Ir a Contratos →</a></p>';
   }
 
+  function sortProperties(list){
+    var col = ui.properties.sortCol;
+    if(!col) return list.slice().sort(function(a,b){return (a.nombre||'').localeCompare(b.nombre||'');});
+    var dir = ui.properties.sortDir==='asc' ? 1 : -1;
+    return list.slice().sort(function(a,b){
+      var va, vb;
+      if(col==='nombre'){ va=(a.nombre||'').toLowerCase(); vb=(b.nombre||'').toLowerCase(); }
+      else if(col==='tipo'){ va=(a.tipo||'').toLowerCase(); vb=(b.tipo||'').toLowerCase(); }
+      else if(col==='estado'){ va=isOccupied(a.id)?1:0; vb=isOccupied(b.id)?1:0; }
+      else if(col==='alquiler'){ va=n(a.alquiler_base); vb=n(b.alquiler_base); }
+      else { va=0; vb=0; }
+      if(va<vb) return -1*dir;
+      if(va>vb) return 1*dir;
+      return (a.nombre||'').localeCompare(b.nombre||'');
+    });
+  }
+
+  function updateSortHeaders(){
+    var table = document.getElementById('properties-table');
+    if(!table) return;
+    var ths = table.querySelectorAll('thead th[data-sort]');
+    for(var i=0;i<ths.length;i++){
+      var th=ths[i], arrow=th.querySelector('.sort-arrow');
+      if(th.dataset.sort===ui.properties.sortCol){
+        th.classList.add('active');
+        if(arrow) arrow.textContent = ui.properties.sortDir==='asc' ? '▲' : '▼';
+      } else {
+        th.classList.remove('active');
+        if(arrow) arrow.textContent = '';
+      }
+    }
+  }
+
   function renderProperties(){
-    var rows = properties.slice().sort(function(a,b){return (a.nombre||'').localeCompare(b.nombre||'');});
+    var rows = sortProperties(properties);
     document.getElementById('property-rows').innerHTML = rows.length===0
       ? '<tr><td colspan="5" class="muted">Todavía no cargaste propiedades. Usá "+ Nueva propiedad" para sumar la primera.</td></tr>'
       : rows.map(function(p){
@@ -369,6 +412,7 @@
             '<td><div class="rowactions"><button class="btn ghost small" data-act="edit-property" data-id="'+p.id+'">Editar</button>'+
             '<button class="btn ghost small danger" data-act="delete-property" data-id="'+p.id+'">Eliminar</button></div></td></tr>';
         }).join('');
+    updateSortHeaders();
 
     var desiredKey = ui.properties.open ? (ui.properties.editId||'add') : 'closed';
     var slot=document.getElementById('property-form-slot');
@@ -562,6 +606,14 @@
   }
 
   document.getElementById('btn-add-property').addEventListener('click', function(){ ui.properties.open=true; ui.properties.editId=null; renderProperties(); });
+  document.querySelector('#properties-table thead').addEventListener('click', function(e){
+    var th=e.target.closest('th[data-sort]');
+    if(!th) return;
+    var col=th.dataset.sort;
+    if(ui.properties.sortCol===col){ ui.properties.sortDir = ui.properties.sortDir==='asc' ? 'desc' : 'asc'; }
+    else { ui.properties.sortCol=col; ui.properties.sortDir='desc'; }
+    renderProperties();
+  });
   document.getElementById('btn-add-contract').addEventListener('click', function(){ ui.contracts.open=true; ui.contracts.editId=null; renderContracts(); });
   document.getElementById('btn-add-expense').addEventListener('click', function(){ ui.expenses.open=true; ui.expenses.editId=null; renderExpenses(); });
   document.getElementById('pay-month').addEventListener('change', function(e){ ui.payments.month=e.target.value||currentMonthStr(); ui.payments.editingKey=null; renderPayments(); });
